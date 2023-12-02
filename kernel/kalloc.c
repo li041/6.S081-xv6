@@ -80,3 +80,17 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+/* calculate free memory by iterate over freelist(fixed size(macro PGSIZE) for each block) */
+uint64 calculate_freemem(void){
+  struct run * r;
+  uint64 count = 0;
+
+  acquire(&kmem.lock);
+  for(r = kmem.freelist; r; r = r->next){
+    count++;
+  }
+  release(&kmem.lock);
+
+  return count * PGSIZE;
+}
