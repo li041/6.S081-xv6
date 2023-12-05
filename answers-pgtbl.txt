@@ -1,0 +1,19 @@
+1.sys_fstat() 
+  This system call retrieves the metadata of an open file. 
+  By storing metadata in the shared read-only page when read-only file is opened, 
+  subsequent calls to sys_fstat() can directly access the value from userspace 
+  without requiring a kernel crossing.
+  
+2. page 0 contains physical address of the intermediate pagetable
+   page 2 contains pa of corresponding va 
+   no, the PTE_U(1L << 4) are not set in page 1(0x0000000021fda00f)
+   0-0-0 process information
+   0-0-1 guard page
+   0-0-2 kstack
+
+   255-511-509
+    shared page
+   255-511-510
+   
+
+   the last page : trampoline

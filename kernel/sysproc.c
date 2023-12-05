@@ -77,10 +77,48 @@ sys_sleep(void)
 
 
 #ifdef LAB_PGTBL
+/* takes three argument:
+ * starting virtual address of the first user page to check(argaddr())
+ * number of pages to check(argint()) 
+ * a user address to a buffer to store the results into a bitmask(copyout())
+ */
+
 int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 a, uva, usrbuf, bitmask;
+  int npages, i;
+  pte_t *ptep;
+  pagetable_t pagetable = myproc()->pagetable;
+
+  if(argaddr(0 , &uva) < 0)
+    return -1;
+  if(argint(1, &npages) < 0)
+    return -1;
+  if(argaddr(2, &usrbuf) < 0)
+    return -1;
+
+  memset(&bitmask, 0, sizeof(bitmask)); // initialize the bitmask
+
+  for(i = 0, a = uva; i < npages; i++, a+=PGSIZE){
+    if((ptep = walk(pagetable, a, 0)) == 0)
+      panic("sys_pgaccess: walk");
+    /*
+    if((*ptep & PTE_V) == 0)
+      panic("sys_pgaccess: not mapped");
+    if(PTE_FLAGS(*ptep) == PTE_V)
+      panic("sys_pgaccess: not a leaf");
+    */
+
+    if(*ptep & PTE_A){  /* pages have been accessed */
+      // set corresponding bit in bitmask
+      bitmask = bitmask | (1 << i);
+    }
+    /* Clear PTE_A after checking if it is set */
+    *ptep = *ptep & (~PTE_A);
+  }
+  copyout(pagetable, usrbuf, (char *)&bitmask, sizeof(bitmask));
   return 0;
 }
 #endif
@@ -89,7 +127,6 @@ uint64
 sys_kill(void)
 {
   int pid;
-
   if(argint(0, &pid) < 0)
     return -1;
   return kill(pid);

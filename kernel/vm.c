@@ -94,7 +94,8 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
       *pte = PA2PTE(pagetable) | PTE_V;
     }
   }
-  return &pagetable[PX(0, va)];
+  return &pagetable[PX(0, va)];     /* pointer to PPN(may NULL or already have one PPN) 
+                                       at the bottom level of page table tree */
 }
 
 // Look up a virtual address, return the physical address,
@@ -279,6 +280,38 @@ freewalk(pagetable_t pagetable)
     }
   }
   kfree((void*)pagetable);
+}
+
+void 
+vmprint(pagetable_t pagetable)
+{
+  int i, j, k;
+  pte_t pte;
+  pagetable_t interm, leaf;  
+
+  printf("page table %p\n", pagetable);
+
+  for(i = 0; i < 512; i++){
+    pte = pagetable[i];
+    if(pte & PTE_V){
+      interm = (pagetable_t)PTE2PA(pte);
+      printf("..%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+      for(j = 0; j < 512; j++){
+        pte = interm[j];
+
+        if(pte & PTE_V){
+          leaf = (pagetable_t)PTE2PA(pte);
+          printf(".. ..%d: pte %p pa %p\n", j, pte, PTE2PA(pte));
+          for(k = 0; k < 512; k++){
+            pte = leaf[k];
+            if(pte & PTE_V)
+              printf(".. .. ..%d: pte %p pa %p\n", k, pte, PTE2PA(pte));
+          }
+        }
+
+      } /* intermediate */
+    }
+  }
 }
 
 // Free user memory pages,
