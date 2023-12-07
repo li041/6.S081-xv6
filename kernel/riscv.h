@@ -323,6 +323,16 @@ r_ra()
   return x;
 }
 
+/* Read the frame pointer of currently executing function in s0 */
+static inline uint64
+r_fp()
+{
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r" (x) );
+  return x;
+}
+
+
 // flush the TLB.
 static inline void
 sfence_vma()

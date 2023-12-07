@@ -47,7 +47,7 @@ struct trapframe {
   /*  16 */ uint64 kernel_trap;   // usertrap()
   /*  24 */ uint64 epc;           // saved user program counter
   /*  32 */ uint64 kernel_hartid; // saved kernel tp
-  /*  40 */ uint64 ra;
+  /*  40 */ uint64 ra;            // 32 slots for ecall to save register value
   /*  48 */ uint64 sp;
   /*  56 */ uint64 gp;
   /*  64 */ uint64 tp;
@@ -92,6 +92,12 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
+
+  int interval;                // interval for sys_alarm
+  uint64 handler;              // handler for sys_alarm
+  int passed_ticks;            // how many ticks have passed since the last call to a process alarm handler  
+  int ishandling;              // prevent re-entrant calls to the handler----if a handler hasn't returned yet, the kernel shouldn't call it again.
+  struct trapframe *alarmframe;// save trapframe when call alarm handler for resuming interrupted timer interupt
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

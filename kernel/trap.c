@@ -65,9 +65,23 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } else if((which_dev = devintr()) == 2){
+
+    if(p->interval != 0){     /* sigalarm has been set(p->interval is initialize to be 0) */
+      p->passed_ticks++;
+
+      if(p->passed_ticks == p->interval){ /* a process's alarm interval expiresn */
+        p->passed_ticks = 0;  /* reset */
+        if(!p->ishandling){
+          p->ishandling = 1;
+          memmove(p->alarmframe, p->trapframe, PGSIZE);   /* save registers in alarmframe */
+          p->trapframe->epc = p->handler;
+        }
+      }
+    }
+  }else if(which_dev == 1){
     // ok
-  } else {
+  }else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
@@ -78,7 +92,9 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
+  {
     yield();
+  }
 
   usertrapret();
 }
@@ -93,7 +109,7 @@ usertrapret(void)
 
   // we're about to switch the destination of traps from
   // kerneltrap() to usertrap(), so turn off interrupts until
-  // we're back in user space, where usertrap() is correct.
+  // we're back in user space, /where usertrap() is correct.
   intr_off();
 
   // send syscalls, interrupts, and exceptions to trampoline.S
