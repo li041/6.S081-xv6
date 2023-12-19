@@ -488,6 +488,7 @@ sched(void)
 
   intena = mycpu()->intena;
   swtch(&p->context, &mycpu()->context);
+  /* return to scheduler(), not sched() here */
   mycpu()->intena = intena;
 }
 

@@ -11,6 +11,8 @@ uint ticks;
 
 extern char trampoline[], uservec[], userret[];
 
+extern int ref_count[];
+
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
 
@@ -65,6 +67,38 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause() == 15){      /* store page fault */
+    uint64 va = r_stval();          /* faulting virtual address */
+    uint64 pa;
+    pte_t* pte;                     /* get the address of pte(by calling walk()) */
+    uint64 ka;                      
+    uint64 flags;
+
+    va = PGROUNDDOWN(va);
+    if(va >= MAXVA){
+      p->killed = 1;
+      goto err;
+    }
+
+    if((pte = walk(p->pagetable, va, 0))== 0){     /* get the pte of va */
+      p->killed = 1;
+      goto err;
+    }
+    pa = PTE2PA(*pte);
+    /* allocate pp at physical address ka for va */
+    if((ka = (uint64)kalloc()) == 0){
+      p->killed = 1;                /* fail to allocate a pp, kill the process */
+      goto err;
+    }
+    memmove((void *)ka, (void *)pa, PGSIZE);          /* copy from pa to new allocated page */
+
+    /* update pagetable and ref_count */
+    flags = PTE_FLAGS(*pte);                          /* get the origin flags */
+    flags = (flags & ~PTE_COW) | PTE_W;               /* clear PTE_COW and set PTE_W */
+    *pte = PA2PTE(ka) | flags;
+    kfree((void *)pa);                                /* decrement ref_count[] and only free if ref_count = 0 */
+    
+    err:; 
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
