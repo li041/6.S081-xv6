@@ -76,7 +76,10 @@ void *
 kalloc(void)
 {
   struct run *r;
+  struct run *stolen_head;
   int cid;
+  int stolen = 0;
+
 
   push_off();
   cid = cpuid();
@@ -94,13 +97,30 @@ kalloc(void)
         continue;
       acquire(&kmem[i].lock);
       r = kmem[i].freelist;
-      if(r){
-        kmem[i].freelist = r->next;
+      stolen_head = r;
+      if(!r){     /* kmem[i].freelist is empty */
+        release(&kmem[i].lock);
+        continue;
+      }
+      while(r->next && stolen < NSTEAL){
+        r = r->next;
+        stolen++;
+      }
+      kmem[i].freelist = r->next;
+      r->next = kmem[cid].freelist;
+      kmem[cid].freelist = stolen_head;
+      if(stolen == NSTEAL){
         release(&kmem[i].lock);
         break;
-      } 
+      }
+
       release(&kmem[i].lock);
     } 
+  }
+
+  if(stolen){
+    r = kmem[cid].freelist;
+    kmem[cid].freelist = r->next;
   }
 
   release(&kmem[cid].lock);
