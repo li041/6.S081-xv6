@@ -369,15 +369,16 @@ iunlockput(struct inode *ip)
 //
 // The content (data) associated with each inode is stored
 // in blocks on the disk. The first NDIRECT block numbers
-// are listed in ip->addrs[].  The next NINDIRECT blocks are
-// listed in block ip->addrs[NDIRECT].
+// are listed in ip->addrs[].  The next NINDIRECTS blocks are
+// listed in block ip->addrs[NDIRECT].(in this case, NDIRECT is 11)
+// The doubly-indirect block is ip->addrs[NDIRECT + 1]
 
 // Return the disk block address of the nth block in inode ip.
 // If there is no such block, bmap allocates one.
 static uint
 bmap(struct inode *ip, uint bn)
 {
-  uint addr, *a;
+  uint addr, *a, *b;
   struct buf *bp;
 
   if(bn < NDIRECT){
@@ -387,7 +388,7 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
-  if(bn < NINDIRECT){
+  if(bn < NINDIRECTS){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr = balloc(ip->dev);
@@ -395,6 +396,29 @@ bmap(struct inode *ip, uint bn)
     a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
       a[bn] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    return addr;
+  }
+  bn -= NINDIRECTS;
+  
+  if(bn < NINDIRECTD){
+    /* doubly-indirect block */
+    if((addr = ip->addrs[DOUBLYINDIRECT]) == 0)
+      ip->addrs[DOUBLYINDIRECT] = addr = balloc(ip->dev);
+    bp = bread(ip->dev, addr);  /* remember to call brelse() */
+    a = (uint*)bp->data;        /* first level table */
+    if((addr = a[bn / NINDIRECTS]) == 0){
+      a[bn / NINDIRECTS] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);                 /* Remember */
+    /* get the addr of second level table */
+    bp = bread(ip->dev, addr);
+    b = (uint*)bp->data;        /* second level table */
+    if((addr = b[bn % NINDIRECTS]) == 0){
+      b[bn % NINDIRECTS] = addr = balloc(ip->dev);
       log_write(bp);
     }
     brelse(bp);
@@ -409,9 +433,9 @@ bmap(struct inode *ip, uint bn)
 void
 itrunc(struct inode *ip)
 {
-  int i, j;
-  struct buf *bp;
-  uint *a;
+  int i, j, k;
+  struct buf *bp, *bpb;
+  uint *a, *b;
 
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
@@ -423,13 +447,33 @@ itrunc(struct inode *ip)
   if(ip->addrs[NDIRECT]){
     bp = bread(ip->dev, ip->addrs[NDIRECT]);
     a = (uint*)bp->data;
-    for(j = 0; j < NINDIRECT; j++){
+    for(j = 0; j < NINDIRECTS; j++){
       if(a[j])
         bfree(ip->dev, a[j]);
     }
     brelse(bp);
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
+  }
+
+  /* free doubly-indirect table */
+  if(ip->addrs[DOUBLYINDIRECT]){
+    bp = bread(ip->dev, ip->addrs[DOUBLYINDIRECT]);
+    a = (uint*)bp->data;
+    for(j = 0; j < NINDIRECTS; j++){
+      if(a[j]){ /* a[j] is the addr of second level table */
+        bpb = bread(ip->dev, a[j]); 
+        b = (uint*)bpb->data;
+        for(k = 0;k < NINDIRECTS; k++){
+          if(b[k])
+            bfree(ip->dev, b[k]);
+        }
+        brelse(bpb);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[DOUBLYINDIRECT]);
+    ip->addrs[DOUBLYINDIRECT] = 0;
   }
 
   ip->size = 0;
