@@ -2818,6 +2818,7 @@ main(int argc, char *argv[])
     void (*f)(char *);
     char *s;
   } tests[] = {
+    {writebig, "writebig"},
     {MAXVAplus, "MAXVAplus"},
     {manywrites, "manywrites"},
     {execout, "execout"},
@@ -2851,7 +2852,6 @@ main(int argc, char *argv[])
     {dirtest, "dirtest"},
     {exectest, "exectest"},
     {bigargtest, "bigargtest"},
-    {bigwrite, "bigwrite"},
     {bsstest, "bsstest"},
     {sbrkbasic, "sbrkbasic"},
     {sbrkmuch, "sbrkmuch"},
@@ -2864,7 +2864,6 @@ main(int argc, char *argv[])
     {stacktest, "stacktest"},
     {opentest, "opentest"},
     {writetest, "writetest"},
-    {writebig, "writebig"},
     {createtest, "createtest"},
     {openiputtest, "openiput"},
     {exitiputtest, "exitiput"},

@@ -1,0 +1,2 @@
+kernel/log.c:  log.lh.n = lh->n;
+kernel/log.c:    log.lh.block[i] = lh->block[i];

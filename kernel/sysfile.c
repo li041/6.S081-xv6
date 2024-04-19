@@ -165,6 +165,42 @@ bad:
   return -1;
 }
 
+// Create a new symbolic link at pah that refers to target
+uint64 
+sys_symlink(void){
+  char name[DIRSIZ], target[DIRSIZ], path[DIRSIZ];
+  struct inode *dp, *ip;
+
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+
+  /* get the correponding inode for target */
+  if((ip = namei(target)) == 0){
+    end_op();
+    return -1;
+  }
+  
+  ilock(ip);
+
+  /* because symlink create a soft link to file at target */
+  ip->nlink++;
+  iupdate(ip);
+  iunlock(ip);
+
+  /* get the inode for the parent and copy the final path element into name */
+  if((dp = nameiparent(path, name)) == 0)
+    goto bad;
+  ilock(dp);
+  if(dirlink(dp, name, ip->inum) < 0) {
+    iunlockput(dp);
+    goto bad;
+  }
+
+  bad:
+}
+
 // Is the directory dp empty except for "." and ".." ?
 static int
 isdirempty(struct inode *dp)
